@@ -1,5 +1,9 @@
 # punched-card-programming
 
+Do you want to experience the program by the punch card?
+
+The repository includes a program that allows a program by marksheet like the punched card.
+
 ## License
 
 ```
