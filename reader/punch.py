@@ -14,14 +14,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__Author__ =  "Yoshihiro Tanaka <contact@cordea.jp>"
-__date__   =  "2016-06-04"
+__Author__  = "Yoshihiro Tanaka <contact@cordea.jp>"
+__date__    = "2016-06-04"
+__version__ = "0.1"
 
 from PIL import Image
 from error import DefNotFoundError
 import sys
+from optparse import OptionParser
 
 THRESHOLD = 40
+
+def setOptions():
+    usage = ""
+    version = __version__
+    parser = OptionParser(usage=usage, version=version)
+
+    parser.add_option(
+            "-c", "--column",
+            action = "store",
+            type = "int",
+            dest = "column",
+            default = 80,
+            help = ""
+            )
+
+    return parser.parse_args()
 
 def isAcceptableColorRange(pixel):
     for p in pixel:
@@ -74,7 +92,7 @@ def getYRegion(rgb, w, h):
         res.append((min(c), max(c)))
     return tuple(res)
 
-def getXRegion(rgb, w, h):
+def getXRegion(rgb, w, h, defCols):
     rows = []
     for y in reversed(range(h)):
         region = []
@@ -90,7 +108,7 @@ def getXRegion(rgb, w, h):
                 if len(region) > 0:
                     rows.append(region)
                     region = []
-        if len(rows) == 81:
+        if len(rows) == (defCols + 1):
             break
         else:
             rows = []
@@ -157,24 +175,28 @@ def toChar(n, defMap):
     return None
 
 if __name__=='__main__':
-    if len(sys.argv) < 3:
+    options, args = setOptions()
+
+    if len(args) < 2:
         print "Argument is missing."
         exit()
 
-    img = Image.open(sys.argv[1])
+    img = Image.open(args[0])
     rgb = img.convert("RGB")
     w, h = img.size
+
+    defCols = options.column
 
     cols = getYRegion(rgb, w, h)
     assert len(cols) == 12
 
-    rows = getXRegion(rgb, w, h)
-    assert len(rows) == 80
+    rows = getXRegion(rgb, w, h, defCols)
+    assert len(rows) == defCols
 
     res = process(rgb, w, h, rows, cols)
-    assert len(res) == 80
+    assert len(res) == defCols
 
-    d = readDef(sys.argv[2])
+    d = readDef(args[1])
     line = ""
     for r in res:
         c = toChar(r, d)
