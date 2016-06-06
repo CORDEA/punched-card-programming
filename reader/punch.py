@@ -26,7 +26,7 @@ from optparse import OptionParser
 THRESHOLD = 40
 
 def setOptions():
-    usage = ""
+    usage = "%prog [options] [definition tsv file] [target image file]"
     version = __version__
     parser = OptionParser(usage=usage, version=version)
 
@@ -36,7 +36,7 @@ def setOptions():
             type = "int",
             dest = "column",
             default = 80,
-            help = ""
+            help = "Number of columns per marksheet."
             )
 
     return parser.parse_args()
