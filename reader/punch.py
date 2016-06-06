@@ -177,11 +177,13 @@ def toChar(n, defMap):
 if __name__=='__main__':
     options, args = setOptions()
 
-    if len(args) < 2:
+    if len(args) != 2:
         print "Argument is missing."
         exit()
 
-    img = Image.open(args[0])
+    defFile,imgFile = args
+
+    img = Image.open(imgFile)
     rgb = img.convert("RGB")
     w, h = img.size
 
@@ -196,7 +198,7 @@ if __name__=='__main__':
     res = process(rgb, w, h, rows, cols)
     assert len(res) == defCols
 
-    d = readDef(args[1])
+    d = readDef(defFile)
     line = ""
     for r in res:
         c = toChar(r, d)
