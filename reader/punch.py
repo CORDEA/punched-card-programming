@@ -178,8 +178,7 @@ if __name__=='__main__':
     options, args = setOptions()
 
     if len(args) != 2:
-        print "Argument is missing."
-        exit()
+        sys.exit("Argument is missing, or too many.")
 
     defFile,imgFile = args
 
