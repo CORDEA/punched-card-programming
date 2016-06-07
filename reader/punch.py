@@ -41,138 +41,169 @@ def setOptions():
 
     return parser.parse_args()
 
-def isAcceptableColorRange(pixel):
-    for p in pixel:
-        if p > THRESHOLD:
-            return False
-    return True
+class Reader:
+    def __init__(self):
+        pass
 
-def isAcceptableRange(c, region):
-    for r in region:
-        if c >= r[0] and c <= r[1]:
-            return True
-    return False
+    def read(self, defFile, imgFile, defCols):
+        img = Image.open(imgFile)
+        self.rgb = img.convert("RGB")
+        self.w, self.h = img.size
 
-def getCurrentPos(c, region):
-    for i in range(len(region)):
-        r = region[i]
-        if c >= r[0] and c <= r[1]:
-            return i
-    return -1
+        cols = self.getYRegion()
+        assert len(cols) == 12
 
-def toPunchCardPos(pos):
-    if   pos == 0:
-        return 12
-    elif pos == 1:
-        return 11
-    return pos - 2
+        rows = self.getXRegion(defCols)
+        assert len(rows) == defCols
 
-def getYRegion(rgb, w, h):
-    cols = []
-    for x in range(w):
-        region = []
-        for y in range(h):
-            p = rgb.getpixel((x, y))
-            if x > 0:
-                befP = rgb.getpixel((x - 1, y))
-            if isAcceptableColorRange(p):
-                if x > 0 and isAcceptableColorRange(befP):
-                    continue
-                region.append(y)
+        res = self.process(rows, cols)
+        assert len(res) == defCols
+
+        d = self.readDef(defFile)
+        line = ""
+        for r in res:
+            c = self.toChar(r, d)
+            if c == None:
+                raise DefNotFoundError(r)
             else:
-                if len(region) > 0:
-                    cols.append(region)
-                    region = []
-        if len(cols) == 12:
-            break
-        else:
-            cols = []
-    res = []
-    for c in cols:
-        res.append((min(c), max(c)))
-    return tuple(res)
+                line = line + c
+        print line
 
-def getXRegion(rgb, w, h, defCols):
-    rows = []
-    for y in reversed(range(h)):
-        region = []
-        for x in range(w):
-            p = rgb.getpixel((x, y))
-            if y > 0:
-                befP = rgb.getpixel((x, y - 1))
-            if isAcceptableColorRange(p):
-                if y > 0 and isAcceptableColorRange(befP):
-                    continue
-                region.append(x)
+    def isAcceptableColorRange(self, pixel):
+        for p in pixel:
+            if p > THRESHOLD:
+                return False
+        return True
+
+    def isAcceptableRange(self, c, region):
+        for r in region:
+            if c >= r[0] and c <= r[1]:
+                return True
+        return False
+
+    def getCurrentPos(self, c, region):
+        for i in range(len(region)):
+            r = region[i]
+            if c >= r[0] and c <= r[1]:
+                return i
+        return -1
+
+    def toPunchCardPos(self, pos):
+        if   pos == 0:
+            return 12
+        elif pos == 1:
+            return 11
+        return pos - 2
+
+    def getYRegion(self):
+        rgb = self.rgb
+        cols = []
+        for x in range(self.w):
+            region = []
+            for y in range(self.h):
+                p = rgb.getpixel((x, y))
+                if x > 0:
+                    befP = rgb.getpixel((x - 1, y))
+                if self.isAcceptableColorRange(p):
+                    if x > 0 and self.isAcceptableColorRange(befP):
+                        continue
+                    region.append(y)
+                else:
+                    if len(region) > 0:
+                        cols.append(region)
+                        region = []
+            if len(cols) == 12:
+                break
             else:
-                if len(region) > 0:
-                    rows.append(region)
-                    region = []
-        if len(rows) == (defCols + 1):
-            break
-        else:
-            rows = []
-    res = []
-    for r in rows[1:]:
-        res.append((min(r), max(r)))
-    return tuple(res)
+                cols = []
+        res = []
+        for c in cols:
+            res.append((min(c), max(c)))
+        return tuple(res)
 
-def process(rgb, w, h, xReg, yReg):
-    cols = []
-    line = -1
-    for x in range(w):
+    def getXRegion(self, defCols):
+        rgb = self.rgb
         rows = []
-        isConn = False
-        befX = x - 1
-        for y in range(h):
-            p = rgb.getpixel((x, y))
-            if x > 0:
-                befP = rgb.getpixel((x - 1, y))
-            if isAcceptableColorRange(p):
-                if x > 0 and isAcceptableColorRange(befP):
-                    continue
-                if not isConn:
-                    l = getCurrentPos(y, yReg)
-                    if l != -1:
-                        rows.append(toPunchCardPos(l))
-                    isConn = True
+        for y in reversed(range(self.h)):
+            region = []
+            for x in range(self.w):
+                p = rgb.getpixel((x, y))
+                if y > 0:
+                    befP = rgb.getpixel((x, y - 1))
+                if self.isAcceptableColorRange(p):
+                    if y > 0 and self.isAcceptableColorRange(befP):
+                        continue
+                    region.append(x)
+                else:
+                    if len(region) > 0:
+                        rows.append(region)
+                        region = []
+            if len(rows) == (defCols + 1):
+                break
             else:
-                isConn = False
-        l = getCurrentPos(x, xReg)
-        if l != -1:
-            if line == l:
-                if len(cols) > l:
-                    if len(cols[l]) == 0 and len(rows) > 0:
-                        cols[l] = rows
-            else:
-                cols.append(rows)
-                line = l
-    return cols
+                rows = []
+        res = []
+        for r in rows[1:]:
+            res.append((min(r), max(r)))
+        return tuple(res)
 
-def readDef(name):
-    defMap = {}
-    with open(name) as f:
-        for line in f.readlines():
-            ts = line.split("\t")
-            ds = tuple([int(r) for r in (ts[0].split(",") if "," in ts[0] else [ts[0]])])
-            if len(ds) not in defMap:
-                defMap[len(ds)] = []
-            defMap[len(ds)].append((ds, ts[1].rstrip()))
-    return defMap
+    def process(self, xReg, yReg):
+        rgb = self.rgb
+        cols = []
+        line = -1
+        for x in range(self.w):
+            rows = []
+            isConn = False
+            befX = x - 1
+            for y in range(self.h):
+                p = rgb.getpixel((x, y))
+                if x > 0:
+                    befP = rgb.getpixel((x - 1, y))
+                if self.isAcceptableColorRange(p):
+                    if x > 0 and self.isAcceptableColorRange(befP):
+                        continue
+                    if not isConn:
+                        l = self.getCurrentPos(y, yReg)
+                        if l != -1:
+                            rows.append(self.toPunchCardPos(l))
+                        isConn = True
+                else:
+                    isConn = False
+            l = self.getCurrentPos(x, xReg)
+            if l != -1:
+                if line == l:
+                    if len(cols) > l:
+                        if len(cols[l]) == 0 and len(rows) > 0:
+                            cols[l] = rows
+                else:
+                    cols.append(rows)
+                    line = l
+        return cols
 
-def toChar(n, defMap):
-    if len(n) == 0:
-        return " "
-    ds = defMap[len(n)]
-    for d in ds:
-        de = d[0]
-        correct = True
-        for i in range(len(de)):
-            if de[i] != n[i]:
-                correct = False
-        if correct:
-            return d[1]
-    return None
+    def readDef(self, name):
+        defMap = {}
+        with open(name) as f:
+            for line in f.readlines():
+                ts = line.split("\t")
+                ds = tuple([int(r) for r in (ts[0].split(",") if "," in ts[0] else [ts[0]])])
+                if len(ds) not in defMap:
+                    defMap[len(ds)] = []
+                defMap[len(ds)].append((ds, ts[1].rstrip()))
+        return defMap
+
+    def toChar(self, n, defMap):
+        if len(n) == 0:
+            return " "
+        ds = defMap[len(n)]
+        for d in ds:
+            de = d[0]
+            correct = True
+            for i in range(len(de)):
+                if de[i] != n[i]:
+                    correct = False
+            if correct:
+                return d[1]
+        return None
 
 if __name__=='__main__':
     options, args = setOptions()
@@ -180,29 +211,5 @@ if __name__=='__main__':
     if len(args) != 2:
         sys.exit("Argument is missing, or too many.")
 
-    defFile,imgFile = args
-
-    img = Image.open(imgFile)
-    rgb = img.convert("RGB")
-    w, h = img.size
-
-    defCols = options.column
-
-    cols = getYRegion(rgb, w, h)
-    assert len(cols) == 12
-
-    rows = getXRegion(rgb, w, h, defCols)
-    assert len(rows) == defCols
-
-    res = process(rgb, w, h, rows, cols)
-    assert len(res) == defCols
-
-    d = readDef(defFile)
-    line = ""
-    for r in res:
-        c = toChar(r, d)
-        if c == None:
-            raise DefNotFoundError(r)
-        else:
-            line = line + c
-    print line
+    rd = Reader()
+    rd.read(args[0], args[1], options.column)
