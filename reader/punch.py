@@ -36,7 +36,7 @@ def setOptions():
             type = "int",
             dest = "column",
             default = 80,
-            help = "Number of columns per marksheet."
+            help = "number of columns per marksheet"
             )
 
     return parser.parse_args()
